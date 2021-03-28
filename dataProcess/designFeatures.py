@@ -56,18 +56,18 @@ class DesignMethod(object):
         # 判断单调性的函数
         def monotonicFlag(series):
             """
-            {0:缺失, 1:持平, 2:递增, 3:递减, 4:无单调性}
+            {0:持平, 1:递增, 2:递减, 3:无单调性}
             """
+            if series.isnull().sum() > 0:
+                series.fillna(0, inplace=True)
             if series.is_monotonic_decreasing and series.is_monotonic_increasing:
-                return 1
-            elif series.is_monotonic_increasing:
-                return 2
-            elif series.is_monotonic_decreasing:
-                return 3
-            elif series.isnull().sum() > 0:
                 return 0
+            elif series.is_monotonic_increasing:
+                return 1
+            elif series.is_monotonic_decreasing:
+                return 2
             else:
-                return 4
+                return 3
 
         monotonic_series = X[colName].apply(monotonicFlag, axis=1)
         return monotonic_series
