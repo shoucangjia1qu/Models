@@ -15,7 +15,7 @@
 *********************************************************************
 *     crossFeatures()           *      交叉特征                       *
 *********************************************************************
-*     ratioFeatures()           *      转为对数占比特征                 *
+*     logratioFeatures()        *      转为对数占比特征                 *
 *********************************************************************
 *     timezoneFeatures()        *      判断时间区间特征                 *
 *********************************************************************
@@ -96,36 +96,36 @@ class DesignMethod(object):
 
 
     # 计算指定特征的统计量
-    def mathFeatures(self, X, colList, keyName):
+    def mathFeatures(self, X, colName):
         """
-        获取指定特征的一些数学统计值，如：最大值、最小值等，形成新的特征
+        自动生成数值型的特征
 
         Parameters
         ----------
         X : DataFrame
-            数据集.
-        colList : List[String]
-            需要统计的特征名列表.
-        keyName : String
-            特征命名的关键字.
+            数据集
+        colName : String
+            需要计算数值型的特征名称.
 
         Returns
         -------
         math_df : DataFrame
-            统计之后的特征
+            生成数值型特征组合的数据.
 
         """
+        series = X[colName]
         math_df = pd.DataFrame()
-        math_df[keyName + "_" + "max"] = X[colList].max(axis=1)
-        math_df[keyName + "_" + "min"] = X[colList].min(axis=1)
-        math_df[keyName + "_" + "mean"] = X[colList].mean(axis=1)
-        math_df[keyName + "_" + "std"] = X[colList].std(axis=1)
+        math_df[colName + "_" + "max"] = series.max(axis=1)
+        math_df[colName + "_" + "min"] = series.min(axis=1)
+        math_df[colName + "_" + "mean"] = series.mean(axis=1)
+        math_df[colName + "_" + "std"] = series.std(axis=1)
         return math_df
 
-
-    def dateFeatures(X, colName, eddt):
+    # 生成日期特征
+    def dateFeatures(self, X, colName, eddt, format='%Y-%m-%d'):
         """
         根据日期特征，求解日期距离当前的天数，形成新的特征
+        若有缺失值，则以当前的日期填缺
 
         Parameters
         ----------
@@ -133,8 +133,10 @@ class DesignMethod(object):
             数据集.
         colName : String
             需要转换的特征.
-        eddt : %Y-%m-%d
-            结束的日期.
+        eddt : String
+            结束日期，也就是当前日期.
+        format : String
+            日期格式，字符串转换为日期格式的格式，默认为'%Y-%m-%d'
 
         Returns
         -------
@@ -142,14 +144,17 @@ class DesignMethod(object):
             转换之后的特征
 
         """
-        dataStamp = datetime.datetime.strptime(eddt, "%Y-%m-%d")
-        date_series = (dataStamp - pd.to_datetime(df[colName], format="%Y-%m-%d")).apply(lambda x: x.days)
+        series = X[colName]
+        if series.isnull().sum() > 0:
+            series.fillna(eddt, inplace=True)
+        dataStamp = datetime.datetime.strptime(eddt, format)
+        date_series = (dataStamp - pd.to_datetime(series, format="%Y-%m-%d")).apply(lambda x: x.days)
         return date_series
 
-
+    # 生成0-1标签
     def whetherFeatures(self, X, colName):
         """
-        根据特征，判断是否有过该特征的性质，形成新的特征
+        根据特征，判断是否有过该特征的性质，形成新的特征，以是否大于0来判断是否有过该特征
 
         Parameters
         ----------
@@ -164,30 +169,87 @@ class DesignMethod(object):
             判断之后的特征
 
         """
-        whether_series = X[colName].notnull().astype(int)
+        series = X[colName]
+        whether_series = (series>0).astype(int)
         return whether_series
 
 
     # 特征交叉
-    def crossFeatures(self, featureA, featureB):
-        crossfeature = (featureA.astype(str) + featureB.astype(str)).astype(int)
-        return crossfeature
+    def crossFeatures(self, X, colNameA, colNameB):
+        """
+        两两生成，交叉特征。
+
+        Parameters
+        ----------
+        X: DataFrame
+            数据集.
+        colNameA : String
+            第一个特征名称.
+        colNameB : String
+            第二个特征名称.
+
+        Returns
+        -------
+        cross_series : Series
+            生成交叉特征之后的新特征
+
+        """
+        seriesA = X[colNameA]
+        seriesB = X[colNameB]
+        cross_series = (seriesA.astype(str) + seriesB.astype(str)).astype(int)
+        return cross_series
 
 
-    # 求对数比值
-    def ratioFeatures(self, X, col1, col2):
+    # 求两个特征的比值取对数
+    def logratioFeatures(self, X, colNameA, colNameB):
+        """
+        对两个特征求比值，并取对数
+
+        Parameters
+        ----------
+        X : DataFrame
+            数据集.
+        colNameA : String
+            第一个特征名称.
+        colNameB : String
+            第二个特征名称.
+
+        Returns
+        -------
+        logratio_series : Series
+            比值取对数后的生成的特征
+
+        """
         exp = 1.0e-4
-        log_series = np.log(X[col1] + exp) - np.log(X[col2] + exp)
-        return log_series
+        logratio_series = np.log(X[colNameA] + exp) - np.log(X[colNameB] + exp)
+        return logratio_series
 
 
     # 求时间区间特征
     def timezoneFeatures(self, X, colName, format):
+        """
+
+        Parameters
+        ----------
+        X : DataFrame
+            数据集.
+        colName : String
+            需要判断的特征.
+        format : String
+            字符换转换成日期格式的日期.
+
+        Returns
+        -------
+        timezone_series : Series
+            时区的分段特征.
+
+        """
         def judgeTimeZone(timeStamp):
             """
             {0:0~6, 1:6~12, 2:12~18, 3:18~24, 99:NaT}
 
             """
+
             if pd.isnull(timeStamp):
                 return 99
             elif 0 <= timeStamp.hour < 6:
@@ -199,12 +261,29 @@ class DesignMethod(object):
             else:
                 return 3
         timess = pd.to_datetime(X[colName], format=format)
-        time_series = timess.apply(judgeTimeZone)
-        return time_series
+        timezone_series = timess.apply(judgeTimeZone)
+        return timezone_series
 
 
     # 求日期戳区间特征
     def dayzoneFeatures(self, X, colName, format):
+        """
+
+        Parameters
+        ----------
+        X : DataFrame
+            数据集.
+        colName : String
+            需要判断的特征.
+        format : String
+            字符换转换成日期格式的日期.
+
+        Returns
+        -------
+        dayzone_series : Series
+            上中下旬的分段特征.
+
+        """
         def judgeDayZone(dateStamp):
             """
             {0:1~10, 1:11~20, 2:21~31, 99:NaT}
@@ -219,8 +298,8 @@ class DesignMethod(object):
             else:
                 return 2
         dayss = pd.to_datetime(X[colName], format=format)
-        day_series = dayss.apply(judgeDayZone)
-        return day_series
+        dayzone_series = dayss.apply(judgeDayZone)
+        return dayzone_series
 
 
 
