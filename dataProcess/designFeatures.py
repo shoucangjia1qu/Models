@@ -17,6 +17,8 @@
 *********************************************************************
 *     logratioFeatures()        *      转为对数占比特征                 *
 *********************************************************************
+*     percentFeatures()         *      转为百分比的特征                 *
+*********************************************************************
 *     timezoneFeatures()        *      判断时间区间特征                 *
 *********************************************************************
 *     dayzoneFeatures()         *      判断日期区间特征                 *
@@ -221,8 +223,33 @@ class DesignMethod(object):
 
         """
         exp = 1.0e-4
-        logratio_series = np.log(X[colNameA] + exp) - np.log(X[colNameB] + exp)
+        logratio_series = np.log(X[colNameA]/(X[colNameB] + exp) + exp)
         return logratio_series
+
+
+    # 求两个特征的百分比特征
+    def percentFeatures(self, X, colNameA, colNameB):
+        """
+        求特征A在特征B中的百分比占比，生成特征
+
+        Parameters
+        ----------
+        X : DataFrame
+            数据集.
+        colNameA : String
+            第一个特征名称.
+        colNameB : String
+            第二个特征名称.
+
+        Returns
+        -------
+        percent_series : Series
+            求百分比后的生成的特征
+
+        """
+        exp = 1.0e-4
+        percent_series = X[colNameA]/(X[colNameB] + exp)
+        return percent_series
 
 
     # 求时间区间特征
